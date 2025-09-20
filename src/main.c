@@ -22,9 +22,9 @@ void autotest();
 // Only uncomment ONE step at a time.
 
 // When testing manual ADC single-shot conversion
-#define STEP2
+// #define STEP2
 // When testing manual ADC free-running conversion
-// #define STEP3
+#define STEP3
 // When testing automated ADC sampling with DMA
 // #define STEP4
 
@@ -46,14 +46,20 @@ uint16_t read_adc() {
     hw_set_bits(&adc_hw->cs, ADC_CS_START_ONCE_BITS);
 
     // wait until the adc is ready again (conversion finished: CS.READY = 1)
-    while (!(adc_hw->cs & ADC_CS_READY_BITS)) {
-        tight_loop_contents();
+    while (!(adc_hw->cs & ADC_CS_READY_BITS)) { // bitwise and to test if the READY bit is set
+        tight_loop_contents(); 
     }
     return (uint16_t)adc_hw->result;   // 12-bit result (0..4095)
 }
 
 void init_adc_freerun() {
     // fill in
+    adc_init();                          // powers up ADC (CS.EN=1)
+    adc_gpio_init(ADC_GPIO);             // prepare GPIO45 for analog
+    adc_select_input(ADC_CH);            // CS.AINSEL = 5
+    adc_set_round_robin(0);              // single channel only (CS.RROBIN = 0)
+    adc_set_clkdiv(0.0f);                // DIV = 0 -> back-to-back conversions
+    hw_set_bits(&adc_hw->cs, ADC_CS_START_MANY_BITS);  // start free-running
 }
 
 void init_dma() {
@@ -75,7 +81,7 @@ int main()
     // Uncomment when you need to run autotest.
     // Keep this commented out until you need it
     // since it adds a lot of time to the upload process.
-    // autotest();
+    autotest();
 
     // Step 2 - singleshot
     #ifdef STEP2
