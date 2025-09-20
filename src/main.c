@@ -3,10 +3,11 @@
 #include "pico/stdlib.h"
 #include "hardware/timer.h"
 #include "hardware/irq.h"
+#include "hardware/adc.h" // need this library for adc
 
 //////////////////////////////////////////////////////////////////////////////
 
-const char* username = "username";
+const char* username = "wang5940";
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -29,12 +30,26 @@ void autotest();
 
 //////////////////////////////////////////////////////////////////////////////
 
+#define ADC_CH   5          // adc channel 5
+#define ADC_GPIO 45         // Channel 5 is on GPIO45 on RP2350B (QFN-80)
+
 void init_adc() {
     // fill in
+    adc_init();                    // powers up the adc block (CS.EN)
+    adc_gpio_init(ADC_GPIO);       // prepares GPIO45 for analog (disables digital pad)
+    adc_select_input(ADC_CH);      // selects channel 5 (CS.AINSEL = 5)
 }
 
 uint16_t read_adc() {
     // fill in
+    // start a single-shot conversion (CS.START_ONCE = 1)
+    hw_set_bits(&adc_hw->cs, ADC_CS_START_ONCE_BITS);
+
+    // wait until the adc is ready again (conversion finished: CS.READY = 1)
+    while (!(adc_hw->cs & ADC_CS_READY_BITS)) {
+        tight_loop_contents();
+    }
+    return (uint16_t)adc_hw->result;   // 12-bit result (0..4095)
 }
 
 void init_adc_freerun() {
@@ -60,7 +75,7 @@ int main()
     // Uncomment when you need to run autotest.
     // Keep this commented out until you need it
     // since it adds a lot of time to the upload process.
-    autotest();
+    // autotest();
 
     // Step 2 - singleshot
     #ifdef STEP2
