@@ -4,6 +4,9 @@
 #include "hardware/timer.h"
 #include "hardware/irq.h"
 #include "hardware/adc.h" // need this library for adc
+#include "hardware/regs/dma.h"
+#include "hardware/structs/dma.h"
+#include "hardware/regs/dreq.h"
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -24,9 +27,9 @@ void autotest();
 // When testing manual ADC single-shot conversion
 // #define STEP2
 // When testing manual ADC free-running conversion
-#define STEP3
+// #define STEP3
 // When testing automated ADC sampling with DMA
-// #define STEP4
+#define STEP4
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -64,10 +67,49 @@ void init_adc_freerun() {
 
 void init_dma() {
     // fill in
+    //Channel 0: stop it first (null trigger)
+    dma_hw->ch[0].ctrl_trig = 0;
+
+    // Read from ADC FIFO, write to variable
+    dma_hw->ch[0].read_addr  = (uint32_t)&adc_hw->fifo;
+    dma_hw->ch[0].write_addr = (uint32_t)&adc_fifo_out;
+
+    // TRANS_COUNT = MODE | COUNT
+    //  - MODE = 1 (retrigger when COUNT hits 0)
+    //  - COUNT = 1 (move one packet per trigger, packet size set in CTRL_TRIG.DATA_SIZE)
+    dma_hw->ch[0].transfer_count = (1u << DMA_CH0_TRANS_COUNT_MODE_LSB) | (1u << DMA_CH0_TRANS_COUNT_COUNT_LSB);
 }
 
 void init_adc_dma() {
     // fill in
+    // Program DMA channel (addresses, counts) but keep it disabled
+    init_dma();
+
+    // Configure ADC for free-running on CH5 (GPIO45)
+    init_adc_freerun();
+
+    // Enable FIFO and DREQ from ADC:
+    //    - FCS.EN:       enable FIFO
+    //    - FCS.DREQ_EN:  assert DMA request when FIFO has data
+    //    - FCS.THRESH=1: DREQ when at least 1 sample is present
+    adc_hw->fcs = 0;  // clear to a known state (optional)
+    adc_hw->fcs = ADC_FCS_EN_BITS | ADC_FCS_DREQ_EN_BITS
+                | (1u << ADC_FCS_THRESH_LSB);
+
+    // Build CTRL_TRIG for DMA CH0 in a temp word, then write once:
+    //    - DATA_SIZE = 1 (halfword = 16-bit; ADC is 12-bit so halfword fits)
+    //    - TREQ_SEL = DREQ_ADC (pace transfers by ADC's DREQ)
+    //    - INCR_READ = 0 (reading a fixed register)
+    //    - INCR_WRITE = 0 (writing to the same scalar variable)
+    //    - EN = 1 (enable channel)
+    uint32_t temp = 0;
+    temp |= (1u << DMA_CH0_CTRL_TRIG_DATA_SIZE_LSB);                 // halfword
+    temp |= ((uint32_t)DREQ_ADC << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB);  // ADC DREQ
+    // INCR_READ/INCR_WRITE default to 0
+    temp |= DMA_CH0_CTRL_TRIG_EN_BITS;                               // enable
+
+    // Write the control word to start the DMA channel 
+    dma_hw->ch[0].ctrl_trig = temp;
 }
 
 //////////////////////////////////////////////////////////////////////////////
