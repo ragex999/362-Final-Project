@@ -34,13 +34,12 @@ void autotest();
 //////////////////////////////////////////////////////////////////////////////
 
 #define ADC_CH   5          // adc channel 5
-#define ADC_GPIO 45         // Channel 5 is on GPIO45 on RP2350B (QFN-80)
-
+#define ADC_GPIO 45         // Channel 5 is GPIO45
 void init_adc() {
     // fill in
-    adc_init();                    // powers up the adc block (CS.EN)
-    adc_gpio_init(ADC_GPIO);       // prepares GPIO45 for analog (disables digital pad)
-    adc_select_input(ADC_CH);      // selects channel 5 (CS.AINSEL = 5)
+    adc_init();                    // powers up the adc block 
+    adc_gpio_init(ADC_GPIO);       // prepares GPIO45 for analog 
+    adc_select_input(ADC_CH);      // selects channel 5 as adc input
 }
 
 uint16_t read_adc() {
@@ -52,22 +51,22 @@ uint16_t read_adc() {
     while (!(adc_hw->cs & ADC_CS_READY_BITS)) { // bitwise and to test if the READY bit is set
         tight_loop_contents(); 
     }
-    return (uint16_t)adc_hw->result;   // 12-bit result (0..4095)
+    return (uint16_t)adc_hw->result;   // 12-bit result 
 }
 
 void init_adc_freerun() {
     // fill in
-    adc_init();                          // powers up ADC (CS.EN=1)
+    adc_init();                          // powers up ADC 
     adc_gpio_init(ADC_GPIO);             // prepare GPIO45 for analog
     adc_select_input(ADC_CH);            // CS.AINSEL = 5
-    adc_set_round_robin(0);              // single channel only (CS.RROBIN = 0)
+    adc_set_round_robin(0);              // single channel only 
     adc_set_clkdiv(0.0f);                // DIV = 0 -> back-to-back conversions
-    hw_set_bits(&adc_hw->cs, ADC_CS_START_MANY_BITS);  // start free-running
+    hw_set_bits(&adc_hw->cs, ADC_CS_START_MANY_BITS);  // start running
 }
 
 void init_dma() {
     // fill in
-    //Channel 0: stop it first (null trigger)
+    // Channel 0: stop it first 
     dma_hw->ch[0].ctrl_trig = 0;
 
     // Read from ADC FIFO, write to variable
@@ -75,8 +74,8 @@ void init_dma() {
     dma_hw->ch[0].write_addr = (uint32_t)&adc_fifo_out;
 
     // TRANS_COUNT = MODE | COUNT
-    //  - MODE = 1 (retrigger when COUNT hits 0)
-    //  - COUNT = 1 (move one packet per trigger, packet size set in CTRL_TRIG.DATA_SIZE)
+    // MODE = 1 (retrigger when COUNT hits 0)
+    // COUNT = 1 (move one packet per trigger, packet size set in CTRL_TRIG.DATA_SIZE)
     dma_hw->ch[0].transfer_count = (1u << DMA_CH0_TRANS_COUNT_MODE_LSB) | (1u << DMA_CH0_TRANS_COUNT_COUNT_LSB);
 }
 
@@ -105,11 +104,10 @@ void init_adc_dma() {
     uint32_t temp = 0;
     temp |= (1u << DMA_CH0_CTRL_TRIG_DATA_SIZE_LSB);                 // halfword
     temp |= ((uint32_t)DREQ_ADC << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB);  // ADC DREQ
-    // INCR_READ/INCR_WRITE default to 0
     temp |= DMA_CH0_CTRL_TRIG_EN_BITS;                               // enable
 
-    // Write the control word to start the DMA channel 
-    dma_hw->ch[0].ctrl_trig = temp;
+    
+    dma_hw->ch[0].ctrl_trig = temp; // Write the control word to start the DMA channel 
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -123,7 +121,7 @@ int main()
     // Uncomment when you need to run autotest.
     // Keep this commented out until you need it
     // since it adds a lot of time to the upload process.
-    autotest();
+    // autotest();
 
     // Step 2 - singleshot
     #ifdef STEP2
